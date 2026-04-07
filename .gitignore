@@ -1,0 +1,13 @@
+#Ignore the environment
+.env
+
+#Ignore csvs
+*.csv
+
+#Ignore bat viles
+*.bat
+
+#Ignore JSON Firebase Secret
+demand-dashboard-7f817-firebase-adminsdk-fbsvc-4292a722de.json
+
+##
