@@ -8,6 +8,10 @@
 *.bat
 
 #Ignore JSON Firebase Secret
-demand-dashboard-7f817-firebase-adminsdk-fbsvc-4292a722de.json
+firebaseJWT.json
 
-##
+#Anything Firebase Related
+404.html
+index.html
+.firebase
+.firebaserc

@@ -6,6 +6,8 @@ import requests
 import re
 from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
+import firebase_admin
+from firebase_admin import credentials, firestore
 
 load_dotenv()
 
@@ -38,6 +40,12 @@ login = session.post(f"{ERP_BASE_URL}/api/method/login", data={
 })
 
 print(f"Logged in as {login.json()['full_name']}") # It should say logged in
+
+# Firebase Initiate
+cred = credentials.Certificate("firebaseJWT.json")
+firebase_admin.initialize_app(cred)
+db = firestore.client()
+print("Firestore Connected Successfully")
 
 # Initiate Engine
 engine = create_engine(f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}")
@@ -114,7 +122,8 @@ def fetch_stock():
 
     return df
 
-## UPLOADING TO DATABASE
+#######################
+# UPLOADING TO DATABASE
 def data_to_db(df, table_name, if_exists="replace"):
     count = pd.read_sql(text(f"""
     SELECT COUNT(*) FROM {table_name}
@@ -123,6 +132,31 @@ def data_to_db(df, table_name, if_exists="replace"):
 
     df.to_sql(table_name, engine, if_exists=if_exists, index=False)
     print(f"Uploaded {len(df)} rows to '{table_name}'")
+
+#######################
+# FIREBASE: IMPORTING
+def push_to_firebase(df, collection_name, document_id):
+    # Delete existing
+    docs = db.collection(collection_name).stream()
+    delete_batch = db.batch()
+    count = 0
+    for doc in docs:
+        delete_batch.delete(doc.reference)
+        count += 1
+        if count % 500 == 0:
+            delete_batch.commit()
+            delete_batch = db.batch()
+    delete_batch.commit()
+
+    records = df.to_dict(orient="records")
+    batch = db.batch()
+    for i, row in enumerate(records):
+        ref = db.collection(collection_name).document(row[document_id])
+        batch.set(ref, row)
+        if (i + 1) % 500 == 0: # check if the remainder is 0 that means 500 batch is looped
+            batch.commit()
+            batch = db.batch()
+    batch.commit()
 
 
 ###########################################################
@@ -164,11 +198,22 @@ def read_clean_sales():
 def get_item_details():
     df = pd.read_sql(text("""
     SELECT
-        item_code,
-        item_name,
-        brand
-    FROM items
+        i.item_code,
+        i.item_name,
+        i.brand,
+        COALESCE(v.valuation_rate, 0) as valuation_rate
+    FROM items i
+    LEFT JOIN (
+        SELECT
+            item_code,
+            AVG(valuation_rate) AS valuation_rate
+        FROM stock
+        WHERE valuation_rate > 0
+        GROUP BY item_code
+        ) v ON i.item_code = v.item_code
     """), engine)
+    df.to_csv("full_item_list.csv", index=False)
+    print("Saved to full_item_list.csv")
     return df
 
 #UAE FORECAST FROM DATABASE
@@ -320,7 +365,7 @@ def reorder_point():
     print(f'UPDATED: reorder_point_{datetime.now().date()}.csv')
     return df
 
-#GET ACTUAL STOCK LEVELS FROM DATABASE (SEPARATED BY COUNTRY)
+# GET ACTUAL STOCK LEVELS FROM DATABASE (SEPARATED BY COUNTRY)
 def actual_stock():
     df = pd.read_sql(text("""
         WITH uae AS(
@@ -365,32 +410,46 @@ def uae_current_demand():
           .merge(df_stock, on='item_code', how='left')
           .merge(df_items, on='item_code', how='inner'))
 
-    #rename total_qty to uae_stock
-    df= df.rename(columns={'uae_total_qty' : 'uae_stock'})
-    # get more forecast ranges
+    df = df.rename(columns={
+        'uae_total_qty': 'uae_stock',
+        'qat_total_qty': 'qat_stock'
+    })
+
+    # Forecast ranges (needed to compute demand)
     df['uae_3_month_forecast'] = (df['uae_monthly_forecast'] * 3).apply(math.ceil)
     df['uae_5_month_forecast'] = (df['uae_monthly_forecast'] * 5).apply(math.ceil)
     df['uae_6_month_forecast'] = (df['uae_monthly_forecast'] * 6).apply(math.ceil)
     df['uae_9_month_forecast'] = (df['uae_monthly_forecast'] * 9).apply(math.ceil)
 
-    # get demands
+    # DEMANDS (keep all)
     df['uae_3_month_demand'] = df['uae_3_month_forecast'] - df['uae_stock']
     df['uae_4_month_demand'] = df['uae_4_month_forecast'] - df['uae_stock']
-    df['uae_5_month_demand'] = df["uae_5_month_forecast"] - df['uae_stock']
-    df['uae_6_month_demand'] = df["uae_6_month_forecast"] - df['uae_stock']
-    df['uae_9_month_demand'] = df["uae_9_month_forecast"] - df['uae_stock']
+    df['uae_5_month_demand'] = df['uae_5_month_forecast'] - df['uae_stock']
+    df['uae_6_month_demand'] = df['uae_6_month_forecast'] - df['uae_stock']
+    df['uae_9_month_demand'] = df['uae_9_month_forecast'] - df['uae_stock']
 
-    # add brand codes
+
     df.insert(1, 'brand_code', df['item_code'].str[:4])
 
-    #Filter Out Un-Orderable
-    #df = df[(df['uae_4_month_demand'] > 0) | (df['uae_5_month_demand'] > 0) | (df['uae_6_month_demand'] > 0) | (df['uae_9_month_demand'] > 0)]
+    drop_cols = [
+        'uae_3_month_forecast',
+        'uae_4_month_forecast',
+        'uae_5_month_forecast',
+        'uae_6_month_forecast',
+        'uae_9_month_forecast'
+    ]
+    df = df.drop(columns=[col for col in drop_cols if col in df.columns])
 
-    #sort descending by 6 months forecast, and sort by brand
+    # Move stock columns to the end
+    cols = [col for col in df.columns if col not in ['uae_stock', 'qat_stock']]
+    df = df[cols + ['uae_stock', 'qat_stock']]
+
+    # Sort
     df = df.sort_values(by=['brand_code', 'uae_6_month_demand'], ascending=[True, False])
-    
+
     df.to_csv(f'uae_current_demand_{datetime.now().date()}.csv', index=False)
     print(f'UPDATED: uae_current_demand_{datetime.now().date()}.csv')
+
     return df
 
 def qat_current_demand():
@@ -402,33 +461,278 @@ def qat_current_demand():
           .merge(df_stock, on='item_code', how='left')
           .merge(df_items, on='item_code', how='inner'))
 
-    #rename total_qty to qat_stock
-    df= df.rename(columns={'qat_total_qty' : 'qat_stock'})
-    # get more forecast ranges
+    df = df.rename(columns={
+        'qat_total_qty': 'qat_stock',
+        'uae_total_qty': 'uae_stock'
+    })
+
     df['qat_3_month_forecast'] = (df['qat_monthly_forecast'] * 3).apply(math.ceil)
     df['qat_5_month_forecast'] = (df['qat_monthly_forecast'] * 5).apply(math.ceil)
     df['qat_6_month_forecast'] = (df['qat_monthly_forecast'] * 6).apply(math.ceil)
     df['qat_9_month_forecast'] = (df['qat_monthly_forecast'] * 9).apply(math.ceil)
 
-    # get demands
     df['qat_3_month_demand'] = df['qat_3_month_forecast'] - df['qat_stock']
     df['qat_4_month_demand'] = df['qat_4_month_forecast'] - df['qat_stock']
-    df['qat_5_month_demand'] = df["qat_5_month_forecast"] - df['qat_stock']
-    df['qat_6_month_demand'] = df["qat_6_month_forecast"] - df['qat_stock']
-    df['qat_9_month_demand'] = df["qat_9_month_forecast"] - df['qat_stock']
+    df['qat_5_month_demand'] = df['qat_5_month_forecast'] - df['qat_stock']
+    df['qat_6_month_demand'] = df['qat_6_month_forecast'] - df['qat_stock']
+    df['qat_9_month_demand'] = df['qat_9_month_forecast'] - df['qat_stock']
 
-    # add brand codes
+   
     df.insert(1, 'brand_code', df['item_code'].str[:4])
 
-    #Filter Out Un-Orderable
-    #df = df[(df['qat_4_month_demand'] > 0) | (df['qat_5_month_demand'] > 0) | (df['qat_6_month_demand'] > 0) | (df['qat_9_month_demand'] > 0)]
+    drop_cols = [
+        'qat_3_month_forecast',
+        'qat_4_month_forecast',
+        'qat_5_month_forecast',
+        'qat_6_month_forecast',
+        'qat_9_month_forecast'
+    ]
+    df = df.drop(columns=[col for col in drop_cols if col in df.columns])
 
-    #sort descending by 6 months forecast, and sort by brand
+    cols = [col for col in df.columns if col not in ['uae_stock', 'qat_stock']]
+    df = df[cols + ['uae_stock', 'qat_stock']]
+
     df = df.sort_values(by=['brand_code', 'qat_6_month_demand'], ascending=[True, False])
-    
+
     df.to_csv(f'qat_current_demand_{datetime.now().date()}.csv', index=False)
     print(f'UPDATED: qat_current_demand_{datetime.now().date()}.csv')
+
     return df
+
+def combined_forecast_report():
+    df_uae = get_uae_forecast()
+    df_qat = get_qat_forecast()
+    df_stock = actual_stock()
+    df_items = get_item_details()
+
+    df = (df_uae[['item_code', 'uae_monthly_forecast', 'uae_4_month_forecast']]
+          .merge(df_qat[['item_code', 'qat_monthly_forecast', 'qat_4_month_forecast']],
+                 on='item_code', how='outer')
+          .merge(df_stock, on='item_code', how='left')
+          .merge(df_items, on='item_code', how='left'))
+
+    df = df.rename(columns={
+        'uae_total_qty': 'uae_stock',
+        'qat_total_qty': 'qat_stock'
+    })
+
+    df['uae_6_month_forecast'] = (df['uae_monthly_forecast'] * 6).apply(math.ceil)
+    df['qat_6_month_forecast'] = (df['qat_monthly_forecast'] * 6).apply(math.ceil)
+
+    cols = [col for col in df.columns if col not in ['uae_stock', 'qat_stock']]
+    df = df[cols + ['uae_stock', 'qat_stock']]
+
+    df.to_csv(f'combined_forecast_{datetime.now().date()}.csv', index=False)
+    print(f'UPDATED: combined_forecast_{datetime.now().date()}.csv')
+
+    return df
+
+
+def danger_zone_report():
+    df_uae = get_uae_forecast()
+    df_qat = get_qat_forecast()
+    df_stock = actual_stock()
+    df_items = get_item_details()
+
+    df = (df_uae[['item_code', 'uae_monthly_forecast']]
+          .merge(df_qat[['item_code', 'qat_monthly_forecast']],
+                 on='item_code', how='outer')
+          .merge(df_stock, on='item_code', how='left')
+          .merge(df_items, on='item_code', how='left'))
+
+    df = df.rename(columns={
+        'uae_total_qty': 'uae_stock',
+        'qat_total_qty': 'qat_stock'
+    })
+
+    #Filling NA to 0
+    df.fillna({
+        'uae_stock': 0,
+        'qat_stock': 0
+    }, inplace=True)
+
+
+
+    df['uae_2_month_forecast'] = (df['uae_monthly_forecast'] * 2).apply(math.ceil)
+    df['qat_2_month_forecast'] = (df['qat_monthly_forecast'] * 2).apply(math.ceil)
+
+    df['uae_2_month_demand'] = (df['uae_2_month_forecast'] - df['uae_stock']).fillna(0)
+    df['qat_2_month_demand'] = (df['qat_2_month_forecast'] - df['qat_stock']).fillna(0)
+
+    df = df[
+        (df['uae_2_month_demand'] > 0) |
+        (df['qat_2_month_demand'] > 0)
+    ]
+
+    df.insert(1, 'brand_code', df['item_code'].str[:4])
+
+    df = df[
+        [
+            'item_code',
+            'brand_code',
+            'item_name',
+            'valuation_rate',
+            'brand',
+            'uae_monthly_forecast',
+            'qat_monthly_forecast',
+            'uae_2_month_demand',
+            'qat_2_month_demand',
+            'uae_stock',
+            'qat_stock'
+        ]
+    ]
+
+    df = df.sort_values(by='item_code')
+
+    df.to_csv(f'danger_zone_{datetime.now().date()}.csv', index=False)
+    print(f'UPDATED: danger_zone_{datetime.now().date()}.csv')
+
+    return df
+
+def prepare_firebase_data():
+    df_uae = get_uae_forecast()
+    df_qat = get_qat_forecast()
+    df_stock = actual_stock()
+    df_items = get_item_details()
+
+    df = (df_uae[['item_code', 'uae_monthly_forecast']]
+          .merge(df_qat[['item_code', 'qat_monthly_forecast']],
+                 on='item_code', how='outer')
+          .merge(df_stock, on='item_code', how='left')
+          .merge(df_items, on='item_code', how='left'))
+
+    df = df.rename(columns={
+        'uae_total_qty': 'uae_stock',
+        'qat_total_qty': 'qat_stock'
+    })
+
+    df['uae_stock'] = df['uae_stock'].fillna(0)
+    df['qat_stock'] = df['qat_stock'].fillna(0)
+
+
+    df['uae_2_month_forecast'] = (df['uae_monthly_forecast'] * 2).apply(math.ceil)
+    df['qat_2_month_forecast'] = (df['qat_monthly_forecast'] * 2).apply(math.ceil)
+
+    df['uae_2_month_demand'] = (df['uae_2_month_forecast'] - df['uae_stock']).fillna(0)
+    df['qat_2_month_demand'] = (df['qat_2_month_forecast'] - df['qat_stock']).fillna(0)
+
+    #Totals of Values of Demand
+    df['total_value'] = ((df['uae_2_month_demand'] + df['qat_2_month_demand']) * df['valuation_rate'])
+
+    df['combined_demand'] = df['uae_2_month_demand'] + df['qat_2_month_demand']
+
+    df = df[df['combined_demand'] >= 1]
+
+    df.insert(1, 'brand_code', df['item_code'].str[:4])
+
+    df = df[
+        [
+            'item_code',
+            'brand_code',
+            'item_name',
+            'brand',
+            'valuation_rate',
+            'uae_2_month_demand',
+            'qat_2_month_demand',
+            'total_value'
+        ]
+    ]
+
+    df = df.sort_values(by='item_code')
+
+    df.to_csv('firebase_data_sku.csv', index=False)
+    print('UPDATED: firebase_data_sku.csv')
+
+    df['item_code'] = df['item_code'].str.replace('/', '-', regex=False)
+
+    while True:
+        print("\n--- Would you like to push to firebase? ---")
+        print("1. Yes")
+        print("2. No")
+
+        choice = input("\nSelect option: ")
+
+        if choice == "1":
+            push_to_firebase(df, "demand_items", "item_code")
+            db.collection("meta").document("last_updated").set({
+                "timestamp": datetime.now().isoformat()
+            })
+            print("Updated last_updated timestamp") 
+            break
+        elif choice == "2":
+            break
+        else:
+            print("Invalid choice, try again.")
+
+    df2 = df.groupby('brand_code').agg({
+        'total_value' : 'sum',
+        'brand' : 'first'
+    }).reset_index()
+
+    df2 = df2[
+        [
+            'brand_code',
+            'brand',
+            'total_value'
+        ]
+    ].sort_values(by='total_value', ascending=False)
+
+    df2.to_csv('firebase_data_brand.csv', index=False)
+    print('UPDATED: firebase_data_brand.csv')
+
+    while True:
+        print("\n--- Would you like to push to firebase? ---")
+        print("1. Yes")
+        print("2. No")
+
+        choice = input("\nSelect option: ")
+
+        if choice == "1":
+            push_to_firebase(df2, "brands", "brand_code")
+            db.collection("meta").document("last_updated").set({
+                "timestamp": datetime.now().isoformat()
+            })
+            print("Updated last_updated timestamp")            
+            break
+        elif choice == "2":
+            break
+        else:
+            print("Invalid choice, try again.")
+
+
+def run_full_cycle():
+    print("\n--- Running Full Cycle ---")
+
+    print("\n1. Updating Items...")
+    data_to_db(fetch_all_items(), "items")
+
+    print("\n2. Updating Stock...")
+    data_to_db(fetch_stock(), "stock")
+    actual_stock()
+
+    print("\n3. Generating UAE Demand...")
+    uae_current_demand()
+
+    print("\n4. Generating QAT Demand...")
+    qat_current_demand()
+
+    print("\n5. Generating Combined Forecast...")
+    combined_forecast_report()
+
+    print("\n6. Generating Danger Zone CSV...")
+    danger_zone_report()
+
+    print("\n7. Initiating Firebase Data Actions...")
+    prepare_firebase_data()
+
+    print("\nFull cycle completed.")
+
+
+
+
+
+
+
 
 ###########################################################
 ####################### MENU LOOP #########################
@@ -436,24 +740,27 @@ def qat_current_demand():
 
 def country_selection_demand():
     while True:
-        print("\n--- Select Country ---")
-        print("1. United Arab Emirates")
-        print("2. Qatar")
-        print("0: Exit")
+        print("\n--- Demand Reports ---")
+        print("1. UAE Demand")
+        print("2. Qatar Demand")
+        print("3. Both")
+        print("0: Back")
 
-        choice = input("\nSelect country: ")
+        choice = input("\nSelect option: ")
 
         if choice == "1":
             uae_current_demand()
         elif choice == "2":
             qat_current_demand()
+        elif choice == "3":
+            uae_current_demand()
+            qat_current_demand()
         elif choice == "0":
-            print("Goodbye!")
             break
         else:
             print("Invalid choice, try again.")
 
-def stock_fectching_seleciton():
+def stock_fetching_selection():
     print("\n --- What would you like to do with stock? ---")
     print("1. Pull and Clean")
     print("2. Pull Only")
@@ -479,10 +786,13 @@ def stock_fectching_seleciton():
 def main():
     while True:
         print("\n--- Menu ---")
-        print("1. Update Current Demand (Sales Upated)")
+        print("1. Update Current Demand")
         print("2. Update Stock Levels (API Pull / DB push / CSV Clean)")
         print("3. Update Item List")
-        print("4. Run Full Cycle")
+        print("4. Generate Combined Forecast Report")
+        print("5. Danger Zone Report")
+        print("6. Firebase")
+        print("7. Run Full Cycle")
         print("0: Exit")
 
         choice = input("\nEnter option: ")
@@ -490,7 +800,17 @@ def main():
         if choice == "1":
             country_selection_demand()
         elif choice == "2":
-            stock_fectching_seleciton()
+            stock_fetching_selection()
+        elif choice == "3":
+            data_to_db(fetch_all_items(), "items")
+        elif choice == "4":
+            combined_forecast_report()
+        elif choice == "5":
+            danger_zone_report()
+        elif choice == "6":
+            prepare_firebase_data()
+        elif choice == "7":
+            run_full_cycle()
         elif choice == "0":
             print("Goodbye!")
             break
