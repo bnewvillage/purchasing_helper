@@ -400,7 +400,7 @@ def actual_stock():
     print(f'UPDATED: actual_stock_{datetime.now().date()}.csv')
     return df
 
-
+# generate UAE only demand
 def uae_current_demand():
     df_stock = actual_stock()
     df_forecast = get_uae_forecast()
@@ -452,6 +452,7 @@ def uae_current_demand():
 
     return df
 
+# generate Qatar only demand
 def qat_current_demand():
     df_stock = actual_stock()
     df_forecast = get_qat_forecast()
@@ -499,6 +500,8 @@ def qat_current_demand():
 
     return df
 
+# get a combined forecast for all countries
+# currently not used for anything other than a generating a csv report
 def combined_forecast_report():
     df_uae = get_uae_forecast()
     df_qat = get_qat_forecast()
@@ -527,7 +530,7 @@ def combined_forecast_report():
 
     return df
 
-
+# A supplementary report for critical status items, not used for anything but a csv generation
 def danger_zone_report():
     df_uae = get_uae_forecast()
     df_qat = get_qat_forecast()
@@ -589,6 +592,8 @@ def danger_zone_report():
 
     return df
 
+# Prepare data for firebase and option to push them to firebase
+# (pushing is deleting entire collections and pushing fresh for accurate data)
 def prepare_firebase_data():
     df_uae = get_uae_forecast()
     df_qat = get_qat_forecast()
@@ -699,7 +704,7 @@ def prepare_firebase_data():
         else:
             print("Invalid choice, try again.")
 
-
+# run the entire process
 def run_full_cycle():
     print("\n--- Running Full Cycle ---")
 
@@ -738,6 +743,7 @@ def run_full_cycle():
 ####################### MENU LOOP #########################
 ###########################################################
 
+# Menu for selecting which countries to generate demand for
 def country_selection_demand():
     while True:
         print("\n--- Demand Reports ---")
@@ -760,6 +766,7 @@ def country_selection_demand():
         else:
             print("Invalid choice, try again.")
 
+# Menu for stock data pull, clean, or both
 def stock_fetching_selection():
     print("\n --- What would you like to do with stock? ---")
     print("1. Pull and Clean")
@@ -782,7 +789,7 @@ def stock_fetching_selection():
         print("Invalid choice, try again.")
 
 
-
+# main menu
 def main():
     while True:
         print("\n--- Menu ---")

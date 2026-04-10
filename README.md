@@ -10,7 +10,6 @@ To use the program, configure your `.env` file with your database and ERP creden
 
 My purpose for writing this software was to solve a real business problem — a motorcycle parts retailer operating across two countries needed a faster, data-driven way to make purchasing decisions rather than relying on gut feel or manual spreadsheet analysis.
 
-[Software Demo Video](https://youtu.be/ykZ_EO7QQIY)
 [Website Demo Version](https://bnewvillage.github.io/purchasing_helper/)
 
 ---
