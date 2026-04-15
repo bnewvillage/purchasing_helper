@@ -1,0 +1,649 @@
+/* =========================================================
+   RESET & ROOT VARIABLES
+   ========================================================= */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --navy:        #0d2144;
+  --navy-mid:    #1a3461;
+  --navy-light:  #e8edf5;
+  --accent:      #c9a84c;
+  --text:        #1a1a2e;
+  --text-muted:  #6b7280;
+  --border:      rgba(13, 33, 68, 0.1);
+  --bg:          #f4f5f7;
+  --white:       #ffffff;
+  --red-soft:    #fff1f0;
+  --red-text:    #c0392b;
+}
+
+/* =========================================================
+   BASE
+   ========================================================= */
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* =========================================================
+   HEADER
+   ========================================================= */
+
+header {
+  background: var(--navy);
+  padding: 0 32px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.header-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+  letter-spacing: 0.02em;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.last-updated-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+
+.last-updated-text {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* =========================================================
+   MAIN LAYOUT
+   ========================================================= */
+
+main {
+  flex: 1;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 28px 32px;
+}
+
+/* =========================================================
+   CONTROLS ROW (demand + currency toggles)
+   ========================================================= */
+
+.controls-row {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  justify-content: flex-end;
+  margin-bottom: 20px;
+}
+
+.toggle-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggle-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.btn-group {
+  display: flex;
+  border: 0.5px solid var(--border);
+  border-radius: 7px;
+  overflow: hidden;
+  background: var(--white);
+}
+
+.btn-toggle {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 13px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  border-right: 0.5px solid var(--border);
+}
+
+.btn-toggle:last-child {
+  border-right: none;
+}
+
+.btn-toggle:hover {
+  background: var(--navy-light);
+  color: var(--navy);
+}
+
+.btn-toggle.active {
+  background: var(--navy);
+  color: #fff;
+}
+
+/* =========================================================
+   SUMMARY CARDS
+   ========================================================= */
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.metric {
+  background: var(--white);
+  border-radius: 10px;
+  border: 0.5px solid var(--border);
+  padding: 18px 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.metric.featured {
+  border-color: var(--navy);
+  border-width: 1px;
+}
+
+.metric.featured::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--accent);
+}
+
+.metric-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--navy-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+  color: var(--navy);
+}
+
+.metric-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.metric-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.metric-value {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+
+.metric.featured .metric-value {
+  color: var(--navy);
+}
+
+/* =========================================================
+   SECTION HEADER
+   ========================================================= */
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.section-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--navy-light);
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+/* =========================================================
+   BRAND LIST & CARDS
+   ========================================================= */
+
+.brand-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.brand-card {
+  background: var(--white);
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: box-shadow 0.15s;
+}
+
+.brand-card:hover {
+  box-shadow: 0 2px 12px rgba(13, 33, 68, 0.08);
+}
+
+/* Brand row layout: color bar | content | chevron */
+.brand-row {
+  display: grid;
+  grid-template-columns: 3px 1fr auto 36px;
+  align-items: stretch;
+  cursor: pointer;
+  user-select: none;
+}
+
+.brand-left-bar {
+  border-radius: 3px 0 0 3px;
+  flex-shrink: 0;
+}
+
+.brand-content {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 16px;
+  transition: background 0.1s;
+}
+
+.brand-row:hover .brand-content {
+  background: #fafbfd;
+}
+
+.brand-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+
+.brand-code-badge {
+  display: inline-block;
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--navy-light);
+  padding: 1px 7px;
+  border-radius: 4px;
+  margin-left: 8px;
+  font-weight: 500;
+  vertical-align: middle;
+}
+
+.brand-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.brand-value-block {
+  text-align: right;
+}
+
+.col-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.col-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+/* Download button inside brand row */
+.brand-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+}
+
+.btn-download {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 0.5px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s, color 0.1s;
+  flex-shrink: 0;
+}
+
+.btn-download:hover {
+  background: var(--navy-light);
+  color: var(--navy);
+}
+
+.btn-download svg {
+  width: 13px;
+  height: 13px;
+}
+
+.brand-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-right: 14px;
+  color: #c0c8d8;
+}
+
+.brand-chevron svg {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.2s ease;
+}
+
+.brand-chevron.open svg {
+  transform: rotate(180deg);
+}
+
+/* =========================================================
+   SKU PANEL
+   ========================================================= */
+
+.sku-panel {
+  border-top: 0.5px solid var(--border);
+  display: none;
+  overflow-x: auto;
+}
+
+.sku-panel.open {
+  display: block;
+}
+
+.sku-table {
+  min-width: 680px;
+  width: 100%;
+}
+
+/* SKU column layout: name | uae demand | qat demand | uae stock | qat stock | unit cost | order value */
+.sku-header,
+.sku-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) 64px 64px 64px 64px 90px 100px;
+  gap: 8px;
+  padding: 8px 16px;
+  align-items: center;
+}
+
+.sku-header {
+  background: #f8f9fb;
+  border-bottom: 0.5px solid var(--border);
+}
+
+.sku-header span {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sku-header span.r {
+  text-align: right;
+}
+
+.sku-row {
+  border-bottom: 0.5px solid rgba(13, 33, 68, 0.05);
+  transition: background 0.1s;
+}
+
+.sku-row:last-child {
+  border-bottom: none;
+}
+
+.sku-row:nth-child(even) {
+  background: #fafbfd;
+}
+
+.sku-row:hover {
+  background: #f0f4fa;
+}
+
+.sku-row.has-neg {
+  background: var(--red-soft);
+}
+
+.sku-row.has-neg:hover {
+  background: #ffe8e6;
+}
+
+.sku-code {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sku-name {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.num {
+  font-size: 12px;
+  text-align: right;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.num.neg {
+  color: var(--red-text);
+}
+
+.num.zero {
+  color: #c0c8d8;
+}
+
+.val {
+  font-size: 12px;
+  font-weight: 600;
+  text-align: right;
+  color: var(--navy);
+}
+
+/* Country dots */
+.dot-uae {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #2563eb;
+  margin-right: 3px;
+  vertical-align: middle;
+}
+
+.dot-qat {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #059669;
+  margin-right: 3px;
+  vertical-align: middle;
+}
+
+/* =========================================================
+   SKELETON LOADER
+   ========================================================= */
+
+.skeleton-card {
+  background: var(--white);
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.skeleton-card:last-child {
+  margin-bottom: 0;
+}
+
+.skel {
+  background: linear-gradient(90deg, #e8edf5 25%, #f4f5f7 50%, #e8edf5 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: 4px;
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* =========================================================
+   FOOTER
+   ========================================================= */
+
+footer {
+  background: var(--white);
+  border-top: 0.5px solid var(--border);
+  padding: 14px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.footer-left {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.footer-left strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.footer-right {
+  font-size: 11px;
+  color: #c0c8d8;
+}
+
+/* =========================================================
+   ERROR STATE
+   ========================================================= */
+
+.error-state {
+  text-align: center;
+  padding: 60px 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* =========================================================
+   RESPONSIVE — MOBILE
+   ========================================================= */
+
+@media (max-width: 639px) {
+  header {
+    padding: 0 16px;
+    height: 56px;
+  }
+
+  .header-title {
+    font-size: 12px;
+  }
+
+  main {
+    padding: 16px;
+  }
+
+  .controls-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .summary-grid .metric:first-child {
+    grid-column: span 2;
+  }
+
+  .metric-value {
+    font-size: 20px;
+  }
+
+  .brand-content {
+    grid-template-columns: 1fr;
+  }
+
+  .brand-value-block {
+    text-align: left;
+  }
+
+  footer {
+    padding: 12px 16px;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-start;
+  }
+}

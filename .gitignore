@@ -9,9 +9,11 @@
 
 #Ignore JSON Firebase Secret
 firebaseJWT.json
+firebase.json
 
 #Anything Firebase Related
 404.html
 index.html
 .firebase
 .firebaserc
+app.js
