@@ -378,8 +378,8 @@ def _apply_wma(recent_total, older_total, recent_days, older_days):
     recent_avg = recent_total.fillna(0) / recent_months
     older_avg  = older_total.fillna(0)  / older_months
 
-    return (recent_avg * WMA_RECENT_WEIGHT) + (older_avg * WMA_OLDER_WEIGHT)
-
+    wma =  (recent_avg * WMA_RECENT_WEIGHT) + (older_avg * WMA_OLDER_WEIGHT)
+    return wma.clip(lower=recent_avg)
 
 def get_uae_forecast():
     """
@@ -916,11 +916,9 @@ def prepare_firebase_data():
         df[f'total_value_{months}m'] = combined * df['valuation_rate'].fillna(0)
 
     # Filter: combined 2-month demand must be >= 1
-    df['combined_demand'] = df['uae_2m_demand'] + df['qat_2m_demand']
+    df['combined_demand'] = df['uae_4m_demand'] + df['qat_4m_demand']
     df = df[df['combined_demand'] >= 1].drop(columns=['combined_demand'])
 
-    # Filter: must have a valid valuation rate
-    df = df[df['total_value_2m'] > 0]
 
     df.insert(1, 'brand_code', df['item_code'].str[:4])
 
